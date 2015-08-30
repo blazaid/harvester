@@ -11,7 +11,7 @@ setuptools.setup(
     install_requires=[],
     author_email='alberto.da@gmail.com',
     description='An easy-to-use Web Scraping tool',
-    long_description=open('README.md').read(),
+    long_description=open('README.rst').read(),
     packages=['harvester'],
     include_package_data=True,
     platforms='any',
