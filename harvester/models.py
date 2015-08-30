@@ -122,7 +122,7 @@ class Field(metaclass=abc.ABCMeta):
 
         :return: The dependencies of this field as a list of strings.
         """
-        return self.dependencies[:]
+        return self.__deps[:]
 
     @property
     def skip_new_lines(self):
