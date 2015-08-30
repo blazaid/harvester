@@ -29,7 +29,7 @@ No requirements for now, and if possible for never.
 Documentation
 *************
 
-We're in process of learning hoy to export the documentation to "readthedocs". Until then, the source code is a very
+We're in process of learning how to export the documentation to "readthedocs". Until then, the source code is a very
 good place (and the only one) to get the documentation. We'll upload the documentation as soon as we can.
 
 
