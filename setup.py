@@ -1,8 +1,9 @@
-from setuptools import setup
+import harvester
+import setuptools
 
-setup(
+setuptools.setup(
     name='harvester',
-    version='0.0.1',
+    version=harvester.__version__,
     url='http://github.com/blazaid/harvester/',
     license='GNU General Public License v3',
     author='blazaid',
