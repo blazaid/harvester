@@ -562,7 +562,7 @@ class Model:
         self.__netloc = parsed_url[1]
 
         # Configure proxies
-        opener = build_opener(ProxyHandler(self.__random_proxy()))
+        opener = build_opener(ProxyHandler(self.proxy()))
 
         # Set headers (included the user-agent)
         opener.addheaders = [('User-Agent', self.agent())]
@@ -672,7 +672,7 @@ class Model:
         """
         return choice(USER_AGENTS) if self.__disguise else self.__user_agent
 
-    def __random_proxy(self):
+    def proxy(self):
         """ Returns a random proxy of those specified in initialization time.
 
         :return: A dictionary with two schemas of access for the randomly chosen proxy, http and https. In case of no
