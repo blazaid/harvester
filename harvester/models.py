@@ -381,9 +381,7 @@ class FileField(Field):
         if value[:2] == '//':
             value = 'http:' + value
 
-        print(self.as_absolute(value))
         file_url = fix_url(self.as_absolute(value))
-        print(file_url)
 
         opener = build_opener(ProxyHandler(self._model.proxy()))
         opener.addheaders = [('User-Agent', self._model.agent())]
