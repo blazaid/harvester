@@ -23,7 +23,9 @@ Installing from source::
 Requirements
 ============
 
-No requirements for now, and if possible for never.
+There are no mandatory requirements. However to use option A, is necessary the installation of library
+`chardet <https://pypi.python.org/pypi/chardet>`_ is mandatory. If it is not installed, the option will be ignored
+leaving a trace.
 
 *************
 Documentation

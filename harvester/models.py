@@ -328,7 +328,8 @@ class ModelField(Field):
                 return self.__cls(
                     url=value,
                     wait_about=self._model.wait_about(),
-                    disable_cache=self._model.disable_cache()
+                    disable_cache=self._model.disable_cache(),
+                    deep_encoding_discovery=self._model.deep_encoding_discovery(),
                 )
 
             if value.startswith('/'):
@@ -337,7 +338,8 @@ class ModelField(Field):
                     return self.__cls(
                         url=self._model.base_url() + value,
                         wait_about=self._model.wait_about(),
-                        disable_cache=self._model.disable_cache()
+                        disable_cache=self._model.disable_cache(),
+                        deep_encoding_discovery=self._model.deep_encoding_discovery(),
                     )
             else:
                 # Well, ok, maybe it's relative against the harveted url. Let's try it.
@@ -346,7 +348,8 @@ class ModelField(Field):
                     return self.__cls(
                         url=self._model.url() + value,
                         wait_about=self._model.wait_about(),
-                        disable_cache=self._model.disable_cache()
+                        disable_cache=self._model.disable_cache(),
+                        deep_encoding_discovery=self._model.deep_encoding_discovery(),
                     )
 
             # No way. It's a content. Well, at least is one less connection.
@@ -476,7 +479,8 @@ class Model:
             disguise=True,
             post_data=None,
             wait_about=None,
-            enable_cache=False
+            enable_cache=False,
+            deep_encoding_discovery=False,
     ):
         """ Initializes the model to extract from a content.
 
@@ -496,6 +500,9 @@ class Model:
         :param wait_about: Waits about the seconds specified. If nothing specified, the harvesting is made as soon as
             possible.
         :param enable_cache: If the cache should be enabled or not. Default is True.
+        :param deep_encoding_discovery: If a deep analysis is needed to dicover the encoding. For this purpose, the 3rd party
+            library "chardet" is needed. If not found, an error message will be displayed and the decode process will
+            continue as if deep_codec_discovery wasn't activated (i.e. False). Defaults to False.
         :raises CircularDependencyError: If one or more of the fields declared as dependencies causes any form of
             circular dependency.
         :raises FieldNotFoundError: If one or more of the fields declared as dependencies does not exist in the field
@@ -512,6 +519,7 @@ class Model:
         self.__proxies = proxies or []
         self.__disguise = disguise
         self.__post_data = post_data
+        self.__deep_encoding_discovery = deep_encoding_discovery
         self.__protocol = None
         self.__netloc = None
         self.__content = None
@@ -579,9 +587,9 @@ class Model:
         content_type_args = {k.strip(): v for k, v in parse_qs(response.headers['Content-Type']).items()}
         if 'charset' in content_type_args and content_type_args['charset']:
             charset = content_type_args['charset'][0]
-            self.__content = force_decode(content, charset)
+            self.__content = force_decode(content, charset, deep_encoding_discovery=self.__deep_encoding_discovery)
         else:
-            self.__content = force_decode(content)
+            self.__content = force_decode(content, deep_encoding_discovery=self.__deep_encoding_discovery)
 
     def __extract(self):
         """ Does the extraction for each of the fields in this model. """
@@ -644,6 +652,13 @@ class Model:
         :return: True if it's disabled or False otherwise.
         """
         return self.__disable_cache
+
+    def deep_encoding_discovery(self):
+        """ If deep encoding is activated for this model
+
+        :return: True if it's activated or False otherwise.
+        """
+        return self.__deep_encoding_discovery
 
     def url(self):
         """ Returns the url used for this model.

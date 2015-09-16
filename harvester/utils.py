@@ -2,11 +2,14 @@ import re
 from urllib.parse import urlsplit, quote, quote_plus, urlunsplit
 
 
-def force_decode(bytes_array, codecs_to_try_first=None):
+def force_decode(bytes_array, codecs_to_try_first=None, deep_encoding_discovery = False):
     """ Forces the decoding of the supplied bytes array.
 
     :param bytes_array: The bytes to decode
     :param codecs_to_try_first: A codec or list of codecs to try before the default codecs. It's and optional parameter.
+    :param deep_encoding_discovery: If a deep analysis is needed to dicover the encoding. For this purpose, the 3rd party
+        library "chardet" is needed. If not found, an error message will be displayed and the decode process will
+        continue as if deep_codec_discovery wasn't activated (i.e. False). Defaults to False.
     :return: The string decoded.
     :raises UnicodeDecodeError: If the bytes array couldn't be decoded with user supplied and default codecs.
     """
@@ -18,6 +21,16 @@ def force_decode(bytes_array, codecs_to_try_first=None):
     for codec in codecs_to_try_first:
         try:
             return bytes_array.decode(codec)
+        except UnicodeDecodeError:
+            pass
+
+    if deep_encoding_discovery:
+        try:
+            import chardet
+            codec = chardet.detect(bytes_array)['encoding']
+            return bytes_array.decode(codec)
+        except ImportError:
+            print('deep_encoding_discovery works only with 3rd party library "chardet". Ignoring deep analysis.')
         except UnicodeDecodeError:
             pass
 
