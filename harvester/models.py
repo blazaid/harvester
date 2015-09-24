@@ -3,12 +3,11 @@ import os
 from random import choice, uniform
 import re
 from urllib.parse import urlparse, parse_qs, urlencode
-from urllib.request import ProxyHandler, build_opener
+from urllib.request import ProxyHandler, build_opener, HTTPCookieProcessor
 import time
 import uuid
-import shutil
 
-from . import __version__
+from . import __version__, __github_url__
 from .utils import fix_url, force_decode
 from .user_agents import USER_AGENTS
 from harvester.utils import is_url
@@ -378,29 +377,25 @@ class FileField(Field):
         self.upload_to = upload_to
 
     def process(self, value):
-        """ Realizes the download of the content. """
-        # TODO Sacar el tema de la conexión y tal a utilidades
+        """ Downloads the content. """
         value = value.strip()
         if value[:2] == '//':
             value = 'http:' + value
 
-        file_url = fix_url(self.as_absolute(value))
-
-        opener = build_opener(ProxyHandler(self._model.proxy()))
-        opener.addheaders = [('User-Agent', self._model.agent())]
-        response = opener.open(file_url)
+        content, _ = Model.touch(
+            self.as_absolute(value),
+            headers=self._model.request_headers(),
+            proxy=self._model.proxy()
+        )
 
         file_path = self.get_file_path(value)
-
         with open(file_path, 'wb') as out_file:
-            shutil.copyfileobj(response, out_file)
-        return file_path
+            out_file.write(content)
+
+        return self.get_file_path(value)
 
     def as_absolute(self, url):
-        if self.is_absolute(url):
-            return url
-        else:
-            return '{}/{}'.format(self._model.base_url(), url)
+        return url if self.is_absolute(url) else '{}/{}'.format(self._model.base_url(), url)
 
     @staticmethod
     def is_absolute(url):
@@ -453,33 +448,20 @@ class FieldNotFoundError(Exception):
         Exception.__init__(self, msg)
 
 
-class SimpleCache:
-    def __init__(self):
-        self.__cache = {}
-
-    def get(self, key):
-        return self.__cache.get(key, None)
-
-    def set(self, key, value):
-        self.__cache[key] = value
-
-    def __contains__(self, item):
-        return self.__cache.__contains__(item)
-
-
 class Model:
     """ Model to extract from a given content or from a http address. """
-    cache = SimpleCache()
+    cache = {}
 
     def __init__(
             self,
             url=None,
             content=None,
             proxies=None,
-            disguise=True,
+            disguise=False,
             post_data=None,
             wait_about=None,
             enable_cache=False,
+            headers=None,
             deep_encoding_discovery=False,
     ):
         """ Initializes the model to extract from a content.
@@ -491,18 +473,16 @@ class Model:
         :param url: The address from which retrieve the content to extract the model. Cannot be used along the "content"
             parameter.
         :param content: The content from which extract the model. Cannot be used along the "url" parameter.
-        :param proxies: Optional parameter which will contain the proxy config for connections. It must be provided as a
-            dictionary mapping protocol names to URLs of proxies (as seen in the example of the description).
-        :param disguise: Optional parameter which set the disguise mode. If True (the default), a random user agent is
-            sent with the headers. If False, a "Agent v.{VERSION No.}" is sent.
-        :param post_data: Optional parameter which sends post data if its value is a dictionary. If false, a GET method
-            is used.
+        :param proxies: Optional parameter which will contain the proxy config for connections. It must be provided as a dictionary mapping protocol names to URLs of proxies (as
+            seen in the example of the description).
+        :param disguise: Optional parameter which set the disguise mode. If True (the default), a random user agent is sent with the headers. If False, a default message is sent.
+        :param post_data: Optional parameter which sends post data if its value is a dictionary. If false, a GET method is used.
         :param wait_about: Waits about the seconds specified. If nothing specified, the harvesting is made as soon as
             possible.
-        :param enable_cache: If the cache should be enabled or not. Default is True.
-        :param deep_encoding_discovery: If a deep analysis is needed to dicover the encoding. For this purpose, the 3rd party
-            library "chardet" is needed. If not found, an error message will be displayed and the decode process will
-            continue as if deep_codec_discovery wasn't activated (i.e. False). Defaults to False.
+        :param enable_cache: If the cache should be enabled or not. Default is False.
+        :param headers: A dictionary with the headers to be used as request headers for the query. It's useful in case of maintain a session. Defaults to None (i.e. no headers).
+        :param deep_encoding_discovery: If a deep analysis is needed to dicover the encoding. For this purpose, the 3rd party library "chardet" is needed. If not found, an error
+            message will be displayed and the decode process will continue as if deep_codec_discovery wasn't activated (i.e. False). Defaults to False.
         :raises CircularDependencyError: If one or more of the fields declared as dependencies causes any form of
             circular dependency.
         :raises FieldNotFoundError: If one or more of the fields declared as dependencies does not exist in the field
@@ -515,7 +495,6 @@ class Model:
             raise ValueError('Only one of "url" or "content" must be provided.')
 
         self.__wait_about = wait_about
-        self.__user_agent = 'Agent v.{0}'.format(__version__)
         self.__proxies = proxies or []
         self.__disguise = disguise
         self.__post_data = post_data
@@ -523,24 +502,43 @@ class Model:
         self.__protocol = None
         self.__netloc = None
         self.__content = None
-        self.__disable_cache = enable_cache
-        self.__headers = Headers()
+        self.__cache_enabled = enable_cache
+        self.__request_headers = headers or {}
         self.__url = url
 
-        if enable_cache and url and url in self.cache:
-            self.__content = self.cache.get(url)
-        elif url:
-            self.__process_url_content(url)
-            if enable_cache:
-                self.cache.set(url, self.__content)
-        else:
-            self.__content = content
-
-        self.__content = self.process_meta(self.__content)
+        self.__content = content or self.__get_content()
 
         # Extracting all the fields info.
         self.__extracted = False
         self.__extract()
+
+    def __get_content(self):
+        if self.cache_enabled() and self.url() in self.cache:
+            # It's in cache so no need for making again the connection
+            return self.cache[self.url()]
+        else:
+            # Cache is not activated or url is not in cache so let's connect
+            parsed_url = urlparse(self.url())
+            self.__protocol = parsed_url[0]
+            self.__netloc = parsed_url[1]
+
+            self.__wait_for_connection()
+            content, response_headers = self.touch(
+                self.url(),
+                data=self.__post_data,
+                headers=self.request_headers(),
+                proxy=self.proxy()
+            )
+
+            content_type_args = {k.strip(): v for k, v in parse_qs(response_headers['Content-Type']).items()}
+            codecs_to_try = content_type_args['charset'][0] if 'charset' in content_type_args and content_type_args['charset'] else []
+
+            decoded_content = force_decode(content, codecs_to_try, deep_encoding_discovery=self.__deep_encoding_discovery)
+
+            if self.cache_enabled():
+                self.cache[self.url()] = decoded_content
+
+            return decoded_content
 
     def __wait_for_connection(self):
         """ Waits some time before doing any connection.
@@ -553,43 +551,6 @@ class Model:
             seconds = float(self.__wait_about)
             if seconds > 0:
                 time.sleep(uniform(seconds, seconds + 1.5))
-
-    def __process_url_content(self, url):
-        """ Does a connection against an url and downloads the content as a string.
-
-        :param url: The url to connect to.
-        :return: The downloaded content as a string.
-        """
-        # Process url
-        self.__wait_for_connection()
-
-        parsed_url = urlparse(url)
-        self.__protocol = parsed_url[0]
-        self.__netloc = parsed_url[1]
-
-        # Configure proxies
-        opener = build_opener(ProxyHandler(self.proxy()))
-
-        # Set headers (included the user-agent)
-        opener.addheaders = [('User-Agent', self.agent())]
-
-        # Connect and return the raw content
-        if self.__post_data is not None:
-            data = urlencode(self.__post_data)
-            data = data.encode('utf-8')
-        else:
-            data = None
-
-        response = opener.open(fix_url(url), data=data)
-        content = response.read()
-        self.__headers = Headers({k: v for k, v in response.getheaders()})
-
-        content_type_args = {k.strip(): v for k, v in parse_qs(response.headers['Content-Type']).items()}
-        if 'charset' in content_type_args and content_type_args['charset']:
-            charset = content_type_args['charset'][0]
-            self.__content = force_decode(content, charset, deep_encoding_discovery=self.__deep_encoding_discovery)
-        else:
-            self.__content = force_decode(content, deep_encoding_discovery=self.__deep_encoding_discovery)
 
     def __extract(self):
         """ Does the extraction for each of the fields in this model. """
@@ -646,12 +607,12 @@ class Model:
         """
         return self.__wait_about
 
-    def disable_cache(self):
+    def cache_enabled(self):
         """ If the cache is disable for this Model.
 
-        :return: True if it's disabled or False otherwise.
+        :return: True if it's enabled, False otherwise.
         """
-        return self.__disable_cache
+        return self.__cache_enabled
 
     def deep_encoding_discovery(self):
         """ If deep encoding is activated for this model
@@ -667,29 +628,32 @@ class Model:
         """
         return self.__url
 
+    def request_headers(self):
+        """ Returns the (request) headers used for this model.
+
+        :return: A dictionary with the headers used for the request.
+        """
+        return self.__request_headers
+
     def base_url(self):
         """ Returns the base url of the url to process by this Model.
 
-        :return: The base url of the url to be processed by this model or None
-            in case of this model were created directly with a content (in
-            witch case it will return None).
+        :return: The base url of the url to be processed by this model or None in case of this model were created directly with a content (in witch case it will return None).
         """
         return '{0}://{1}'.format(self.__protocol, self.__netloc)
 
     def agent(self):
         """ Returns a Web agent.
 
-        If the harvester is configured with "disguise" parameter, the user agent
-        will be one out of the existent agents. If not, the agent will be the
-        harvester user agent.
+        If the harvester is configured with "disguise" parameter, the user agent will be one out of the existent agents. If not, the agent will be the harvester user agent.
         """
-        return choice(USER_AGENTS) if self.__disguise else self.__user_agent
+        return choice(USER_AGENTS) if self.__disguise else 'Harvester v.{} ({})'.format(__version__, __github_url__)
 
     def proxy(self):
         """ Returns a random proxy of those specified in initialization time.
 
-        :return: A dictionary with two schemas of access for the randomly chosen proxy, http and https. In case of no
-            proxies specified in initialization time, the return value will be a empty dictionary.
+        :return: A dictionary with two schemas of access for the randomly chosen proxy, http and https. In case of no proxies specified in initialization time, the return value
+            will be a empty dictionary.
         """
         if self.__proxies:
             proxy = choice(self.__proxies)
@@ -725,3 +689,39 @@ class Model:
         """ Removes all the content after the reg_exp specified by drop_after. """
         m = re.search(r'(^.*?)(?:{0})'.format(tag), content, re.DOTALL | re.IGNORECASE)
         return m.group(1) if m else content
+
+    @staticmethod
+    def touch(url, data=None, headers=None, proxy=None):
+        """ Touches the given url.
+
+        The proxy to use may be specified (if needed, is optional) in two forms:
+        1. As an IP: an string representing a valid IP. In this case, the proxy will be used by all the needed protocols.
+        2. As a dictionary: The keys will be the protocols and the values will be the ip to use in this protocols. An example of this is as follows:
+        proxy = {
+            'http': '82.31.89.21',
+            'https': '82.31.89.27'
+        }
+
+        :param url: The url to connect to.
+        :param data: In case of a POST or PUT method, the data to be sent. Defaults to None.
+        :param headers: The headers to send along with the request. Should be represented as a dictionary.
+        :param proxy: The proxy through which to connect. May be specified as a dictionary or a string (see above for more information). Defaults to None (i.e. no proxy).
+        :return: A tuple in the form (content, headers) representing the content of the response as a byte-string and the response headers as a dictionary.
+        """
+        # Process the data
+        data_to_send = urlencode(data).encode('utf-8') if data else None
+
+        # Prepare the request
+        opener = build_opener(
+            ProxyHandler(proxy or {}),
+            HTTPCookieProcessor()
+        )
+        opener.addheaders = (headers or {}).items()
+
+        # Do the connection
+        response = opener.open(fix_url(url), data=data_to_send)
+
+        return (
+            response.read(),  # The content of the get method.
+            {k: v for k, v in response.headers.items()},  # The headers as a dictionary
+        )

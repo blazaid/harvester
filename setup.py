@@ -4,7 +4,7 @@ import setuptools
 setuptools.setup(
     name='harvester',
     version=harvester.__version__,
-    url='http://github.com/blazaid/harvester/',
+    url=harvester.__github_url__,
     license='GNU General Public License v3',
     author='blazaid',
     tests_require=[],

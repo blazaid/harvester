@@ -1,8 +1,9 @@
 import re
-from urllib.parse import urlsplit, quote, quote_plus, urlunsplit
+from urllib.parse import urlsplit, quote, quote_plus, urlunsplit, urlencode
+from urllib.request import ProxyHandler, build_opener
 
 
-def force_decode(bytes_array, codecs_to_try_first=None, deep_encoding_discovery = False):
+def force_decode(bytes_array, codecs_to_try_first=None, deep_encoding_discovery=False):
     """ Forces the decoding of the supplied bytes array.
 
     :param bytes_array: The bytes to decode
