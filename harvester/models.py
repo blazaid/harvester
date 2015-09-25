@@ -4,6 +4,7 @@ from random import choice, uniform
 import re
 from urllib.parse import urlparse, parse_qs, urlencode
 from urllib.request import ProxyHandler, build_opener, HTTPCookieProcessor
+import http.cookiejar
 import time
 import uuid
 
@@ -319,43 +320,38 @@ class ModelField(Field):
     def process(self, value):
         """ Transforms the extracted value in an instance of the class model specified in the initialization. """
         if value:
+            params = {
+                'proxies': self._model.proxies(),
+                'disguise': self._model.disguise(),
+                'wait_about': self._model.wait_about(),
+                'enable_cache': self._model.cache_enabled(),
+                'headers': self._model.request_headers(),
+                'cookies': self._model.cookies(),
+                'deep_encoding_discovery': self._model.deep_encoding_discovery(),
+            }
+
+            # TODO Check. I think this piece of code is wrong because it doesn't continues afeter the elif.
             if self.__ignore_url_process or not is_url(value):
                 # Noatter if the content is and url or not, we want to parse the content as-is
-                return self.__cls(content=value)
+                return self.__cls(content=value, **params)
             elif is_url(value):
                 # Ok, it's an url, so let's download and parse the content.
-                return self.__cls(
-                    url=value,
-                    wait_about=self._model.wait_about(),
-                    disable_cache=self._model.disable_cache(),
-                    deep_encoding_discovery=self._model.deep_encoding_discovery(),
-                )
+                return self.__cls(url=value, **params)
 
             if value.startswith('/'):
                 # Maybe is an absolute url (i.e. hanging of the base url of the harvested site) so let's try against it
-                if is_url(self._model.base_url() + value):
-                    return self.__cls(
-                        url=self._model.base_url() + value,
-                        wait_about=self._model.wait_about(),
-                        disable_cache=self._model.disable_cache(),
-                        deep_encoding_discovery=self._model.deep_encoding_discovery(),
-                    )
+                absolute_url = self._model.base_url() + value
+                if is_url(absolute_url):
+                    return self.__cls(url=absolute_url, **params)
             else:
                 # Well, ok, maybe it's relative against the harveted url. Let's try it.
-                if is_url(self._model.url() + value):
+                absolute_url = self._model.url() + value
+                if is_url(absolute_url):
                     # Ahora es una url.
-                    return self.__cls(
-                        url=self._model.url() + value,
-                        wait_about=self._model.wait_about(),
-                        disable_cache=self._model.disable_cache(),
-                        deep_encoding_discovery=self._model.deep_encoding_discovery(),
-                    )
+                    return self.__cls(url=absolute_url, **params)
 
             # No way. It's a content. Well, at least is one less connection.
-            return self.__cls(
-                content=value,
-                disable_cache=self._model.disable_cache()
-            )
+            return self.__cls(content=value, **params)
         else:
             return None
 
@@ -462,6 +458,7 @@ class Model:
             wait_about=None,
             enable_cache=False,
             headers=None,
+            cookies=None,
             deep_encoding_discovery=False,
     ):
         """ Initializes the model to extract from a content.
@@ -481,6 +478,7 @@ class Model:
             possible.
         :param enable_cache: If the cache should be enabled or not. Default is False.
         :param headers: A dictionary with the headers to be used as request headers for the query. It's useful in case of maintain a session. Defaults to None (i.e. no headers).
+        :param cookies: The cookies (as a CookieJar or any subclass object) for maintaining a session. Default to None (i.e. no session).
         :param deep_encoding_discovery: If a deep analysis is needed to dicover the encoding. For this purpose, the 3rd party library "chardet" is needed. If not found, an error
             message will be displayed and the decode process will continue as if deep_codec_discovery wasn't activated (i.e. False). Defaults to False.
         :raises CircularDependencyError: If one or more of the fields declared as dependencies causes any form of
@@ -504,6 +502,7 @@ class Model:
         self.__content = None
         self.__cache_enabled = enable_cache
         self.__request_headers = headers or {}
+        self.__cookies = cookies
         self.__url = url
 
         self.__content = content or self.__get_content()
@@ -523,11 +522,12 @@ class Model:
             self.__netloc = parsed_url[1]
 
             self.__wait_for_connection()
-            content, response_headers = self.touch(
+            content, response_headers, cookies = self.touch(
                 self.url(),
                 data=self.__post_data,
                 headers=self.request_headers(),
-                proxy=self.proxy()
+                proxy=self.proxy(),
+                cookies=self.__cookies,
             )
 
             content_type_args = {k.strip(): v for k, v in parse_qs(response_headers['Content-Type']).items()}
@@ -635,6 +635,13 @@ class Model:
         """
         return self.__request_headers
 
+    def cookies(self):
+        """ Returns the cookies stored by this model.
+
+        :return: A CookieJar (or any of its subclasses) object.
+        """
+        return self.__cookies
+
     def base_url(self):
         """ Returns the base url of the url to process by this Model.
 
@@ -648,6 +655,14 @@ class Model:
         If the harvester is configured with "disguise" parameter, the user agent will be one out of the existent agents. If not, the agent will be the harvester user agent.
         """
         return choice(USER_AGENTS) if self.__disguise else 'Harvester v.{} ({})'.format(__version__, __github_url__)
+
+    def disguise(self):
+        """ Returns if the model is or not in disguise model. """
+        return self.__disguise
+
+    def proxies(self):
+        """ Returns the list of proxies this model has. """
+        return self.__proxies
 
     def proxy(self):
         """ Returns a random proxy of those specified in initialization time.
@@ -691,7 +706,7 @@ class Model:
         return m.group(1) if m else content
 
     @staticmethod
-    def touch(url, data=None, headers=None, proxy=None):
+    def touch(url, data=None, headers=None, proxy=None, cookies=None):
         """ Touches the given url.
 
         The proxy to use may be specified (if needed, is optional) in two forms:
@@ -706,15 +721,17 @@ class Model:
         :param data: In case of a POST or PUT method, the data to be sent. Defaults to None.
         :param headers: The headers to send along with the request. Should be represented as a dictionary.
         :param proxy: The proxy through which to connect. May be specified as a dictionary or a string (see above for more information). Defaults to None (i.e. no proxy).
-        :return: A tuple in the form (content, headers) representing the content of the response as a byte-string and the response headers as a dictionary.
+        :return: A tuple in the form (content, headers, cookies) representing the content of the response as a byte-string, the response headers as a dictionary and the cookies
+            sent by the server.
         """
         # Process the data
         data_to_send = urlencode(data).encode('utf-8') if data else None
 
         # Prepare the request
+        cj = cookies or http.cookiejar.CookieJar()
         opener = build_opener(
             ProxyHandler(proxy or {}),
-            HTTPCookieProcessor()
+            HTTPCookieProcessor(cj)
         )
         opener.addheaders = (headers or {}).items()
 
@@ -724,4 +741,5 @@ class Model:
         return (
             response.read(),  # The content of the get method.
             {k: v for k, v in response.headers.items()},  # The headers as a dictionary
+            cj,  # The cookies
         )
