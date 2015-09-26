@@ -378,7 +378,7 @@ class FileField(Field):
         if value[:2] == '//':
             value = 'http:' + value
 
-        content, _ = Model.touch(
+        content, _, _ = Model.touch(
             self.as_absolute(value),
             headers=self._model.request_headers(),
             proxy=self._model.proxy()
