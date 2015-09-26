@@ -388,7 +388,7 @@ class FileField(Field):
         with open(file_path, 'wb') as out_file:
             out_file.write(content)
 
-        return self.get_file_path(value)
+        return file_path
 
     def as_absolute(self, url):
         return url if self.is_absolute(url) else '{}/{}'.format(self._model.base_url(), url)
