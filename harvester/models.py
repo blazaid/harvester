@@ -254,7 +254,7 @@ class FloatField(Field):
         if value.count(self.decimal_mark) > 1:
             raise ValueError('Decimal mark cannot appear more than once ({})'.format(value))
 
-        temp_mark = uuid.uuid4()
+        temp_mark = str(uuid.uuid4())
         value = value.strip().replace(self.decimal_mark, temp_mark)
         value = value.replace(self.thousands_mark, '')
         value = value.replace(temp_mark, '.')

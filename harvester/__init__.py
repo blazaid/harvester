@@ -1,2 +1,2 @@
-__version__ = '0.2.5'
+__version__ = '0.2.7'
 __github_url__ = 'http://github.com/blazaid/harvester/'
