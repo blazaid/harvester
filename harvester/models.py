@@ -237,7 +237,7 @@ class IntegerField(Field):
 class FloatField(Field):
     """ Field for processing integer types. """
 
-    def __init__(self, args, decimal_mark='.', **kwargs):
+    def __init__(self, *args, decimal_mark='.', **kwargs):
         """ Initializes the descriptor for float types
 
         :param args: All the positional parameters specified in Field superclass.
