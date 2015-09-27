@@ -330,28 +330,21 @@ class ModelField(Field):
                 'deep_encoding_discovery': self._model.deep_encoding_discovery(),
             }
 
-            # TODO Check. I think this piece of code is wrong because it doesn't continues afeter the elif.
-            if self.__ignore_url_process or not is_url(value):
-                # Noatter if the content is and url or not, we want to parse the content as-is
-                return self.__cls(content=value, **params)
-            elif is_url(value):
-                # Ok, it's an url, so let's download and parse the content.
-                return self.__cls(url=value, **params)
-
-            if value.startswith('/'):
-                # Maybe is an absolute url (i.e. hanging of the base url of the harvested site) so let's try against it
-                absolute_url = self._model.base_url() + value
-                if is_url(absolute_url):
-                    return self.__cls(url=absolute_url, **params)
+            if self.__ignore_url_process:
+                # No matter if the content is and url or not, we want to parse the content as-is
+                return self.__cls(content=value, url=self._model.url(), **params)
             else:
-                # Well, ok, maybe it's relative against the harveted url. Let's try it.
-                absolute_url = self._model.url() + value
-                if is_url(absolute_url):
-                    # Ahora es una url.
-                    return self.__cls(url=absolute_url, **params)
+                if is_url(value):
+                    # Ok, it's an url, so let's download and parse the content.
+                    return self.__cls(url=value, **params)
+                elif value.startswith('/'):
+                    # Maybe is an absolute url (i.e. hanging of the base url of the harvested site) so let's try against it
+                    absolute_url = self._model.base_url() + value
+                    if is_url(absolute_url):
+                        return self.__cls(url=absolute_url, **params)
 
             # No way. It's a content. Well, at least is one less connection.
-            return self.__cls(content=value, **params)
+            return self.__cls(content=value, url=self._model.url(), **params)
         else:
             return None
 
@@ -378,13 +371,18 @@ class FileField(Field):
         if value[:2] == '//':
             value = 'http:' + value
 
-        content, _, _ = Model.touch(
+        content, headers, _ = Model.touch(
             self.as_absolute(value),
             headers=self._model.request_headers(),
             proxy=self._model.proxy()
         )
 
-        file_path = self.get_file_path(value)
+        if 'Content-Disposition' in headers and len(re.findall(r'filename=(\S+)', headers['Content-Disposition'])) > 0:
+            filename = re.findall(r'filename=(\S+)', headers['Content-Disposition'])[0].strip()
+        else:
+            filename = value
+
+        file_path = self.get_file_path(filename)
         with open(file_path, 'wb') as out_file:
             out_file.write(content)
 
@@ -467,9 +465,9 @@ class Model:
         in the parameter or directly with a textual content (but no both. If
         None or both are specified, a ValueError will be raised).
 
-        :param url: The address from which retrieve the content to extract the model. Cannot be used along the "content"
-            parameter.
-        :param content: The content from which extract the model. Cannot be used along the "url" parameter.
+        :param url: The address from which retrieve the content to extract the model. If used with "content" parameter, the url will be saved as the url for the content, but the
+            model will parse the content and not the source of url (i.e. will not make any request to that url).
+        :param content: The content from which extract the model. If None, the model will retrieve the content from the source of the specified url. Defaults to None.
         :param proxies: Optional parameter which will contain the proxy config for connections. It must be provided as a dictionary mapping protocol names to URLs of proxies (as
             seen in the example of the description).
         :param disguise: Optional parameter which set the disguise mode. If True (the default), a random user agent is sent with the headers. If False, a default message is sent.
@@ -489,16 +487,12 @@ class Model:
         """
         if not url and not content:
             raise ValueError('Either "url" or "content" must be provided.')
-        elif url and content:
-            raise ValueError('Only one of "url" or "content" must be provided.')
 
         self.__wait_about = wait_about
         self.__proxies = proxies or []
         self.__disguise = disguise
         self.__post_data = post_data
         self.__deep_encoding_discovery = deep_encoding_discovery
-        self.__protocol = None
-        self.__netloc = None
         self.__content = None
         self.__cache_enabled = enable_cache
         self.__request_headers = headers or {}
@@ -517,10 +511,6 @@ class Model:
             return self.cache[self.url()]
         else:
             # Cache is not activated or url is not in cache so let's connect
-            parsed_url = urlparse(self.url())
-            self.__protocol = parsed_url[0]
-            self.__netloc = parsed_url[1]
-
             self.__wait_for_connection()
             content, response_headers, cookies = self.touch(
                 self.url(),
@@ -647,7 +637,8 @@ class Model:
 
         :return: The base url of the url to be processed by this model or None in case of this model were created directly with a content (in witch case it will return None).
         """
-        return '{0}://{1}'.format(self.__protocol, self.__netloc)
+        parsed_url = urlparse(self.url())
+        return '{0}://{1}'.format(parsed_url[0], parsed_url[1])
 
     def agent(self):
         """ Returns a Web agent.
