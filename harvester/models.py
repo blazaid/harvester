@@ -330,6 +330,7 @@ class ModelField(Field):
                 'deep_encoding_discovery': self._model.deep_encoding_discovery(),
             }
 
+            # TODO Check. I think this piece of code is wrong because it doesn't continues after the elif.
             if self.__ignore_url_process:
                 # No matter if the content is and url or not, we want to parse the content as-is
                 return self.__cls(content=value, url=self._model.url(), **params)
@@ -377,7 +378,10 @@ class FileField(Field):
             proxy=self._model.proxy()
         )
 
-        filename = re.findall(r'filename=(\S+)', headers['Content-Disposition']) if 'ContentDisposition' in headers else value
+        if 'Content-Disposition' in headers and len(re.findall(r'filename=(\S+)', headers['Content-Disposition'])) > 0:
+            filename = re.findall(r'filename=(\S+)', headers['Content-Disposition'])[0].strip()
+        else:
+            filename = value
 
         file_path = self.get_file_path(filename)
         with open(file_path, 'wb') as out_file:
