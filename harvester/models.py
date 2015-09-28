@@ -229,9 +229,12 @@ class IntegerField(Field):
 
     def process(self, value):
         """ Transforms the extracted value to the expected integer data. """
-        for thousand_mark in self.__thousands_marks:
-            value = value.replace(thousand_mark, '')
-        return int(value.replace(',', '').replace('.', ''))
+        if value is not None and value != '':
+            for thousand_mark in self.__thousands_marks:
+                value = value.replace(thousand_mark, '')
+            return int(value.replace(',', '').replace('.', ''))
+        else:
+            return None
 
 
 class FloatField(Field):
