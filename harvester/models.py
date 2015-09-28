@@ -499,6 +499,7 @@ class Model:
         self.__content = None
         self.__cache_enabled = enable_cache
         self.__request_headers = headers or {}
+        self.__response_headers = None
         self.__cookies = cookies
         self.__url = url
 
@@ -515,7 +516,7 @@ class Model:
         else:
             # Cache is not activated or url is not in cache so let's connect
             self.__wait_for_connection()
-            content, response_headers, cookies = self.touch(
+            content, self.__response_headers, cookies = self.touch(
                 self.url(),
                 data=self.__post_data,
                 headers=self.request_headers(),
@@ -523,7 +524,7 @@ class Model:
                 cookies=self.__cookies,
             )
 
-            content_type_args = {k.strip(): v for k, v in parse_qs(response_headers['Content-Type']).items()}
+            content_type_args = {k.strip(): v for k, v in parse_qs(self.__response_headers['Content-Type']).items()}
             codecs_to_try = content_type_args['charset'][0] if 'charset' in content_type_args and content_type_args['charset'] else []
 
             decoded_content = force_decode(content, codecs_to_try, deep_encoding_discovery=self.__deep_encoding_discovery)
@@ -622,11 +623,12 @@ class Model:
         return self.__url
 
     def request_headers(self):
-        """ Returns the (request) headers used for this model.
-
-        :return: A dictionary with the headers used for the request.
-        """
+        """ Returns the (request) headers used for this model as a dictionary. """
         return self.__request_headers
+
+    def response_headers(self):
+        """ Returns the (response) headers used for this model as a dictionary. """
+        return self.__response_headers
 
     def cookies(self):
         """ Returns the cookies stored by this model.
