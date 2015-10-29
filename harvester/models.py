@@ -524,7 +524,7 @@ class Model:
                 cookies=self.__cookies,
             )
 
-            content_type_args = {k.strip(): v for k, v in parse_qs(self.__response_headers['Content-Type']).items()}
+            content_type_args = {k.strip(): v for k, v in parse_qs(self.__response_headers.get('Content-Type', {})).items()}
             codecs_to_try = content_type_args['charset'][0] if 'charset' in content_type_args and content_type_args['charset'] else []
 
             decoded_content = force_decode(content, codecs_to_try, deep_encoding_discovery=self.__deep_encoding_discovery)
