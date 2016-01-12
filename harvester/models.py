@@ -7,6 +7,8 @@ from urllib.request import ProxyHandler, build_opener, HTTPCookieProcessor
 import http.cookiejar
 import time
 import uuid
+import mimetypes
+import imghdr
 
 from . import __version__, __github_url__
 from .utils import fix_url, force_decode
@@ -386,9 +388,10 @@ class FileField(Field):
         else:
             filename = value
 
-        file_path = self.get_file_path(filename)
-        with open(file_path, 'wb') as out_file:
-            out_file.write(content)
+        file_path = self.get_file_path(filename, content)
+        if file_path:
+            with open(file_path, 'wb') as out_file:
+                out_file.write(content)
 
         return file_path
 
@@ -399,22 +402,36 @@ class FileField(Field):
     def is_absolute(url):
         return bool(urlparse(url).netloc)
 
-    def get_file_path(self, file_url):
+    def get_file_path(self, file_url, content):
         # TODO Lo mismo viene bien sacar esto a utilidades
         base_path = os.path.abspath(self.upload_to)
         if not os.path.exists(base_path):
             os.makedirs(base_path)
 
         filename_base, filename_extension = os.path.splitext(file_url.split('/')[-1])
+        if not filename_extension:
+            # No extension in filename so let's see if it's an image (see the content).
+            ext = imghdr.what(None, h=content)
+            filename_extension = '.{}'.format(ext) if ext else None
+        if not filename_extension:
+            # Ok, not an image. Let's guess it from the mimetype returned by the headers.
+            filename_extension = (
+                key
+                for key, value in mimetypes.types_map.items()
+                if value == self._model.response_headers().get('Content-Type', None)
+            ).__next__()
 
-        file_path = os.path.join(base_path, '{}{}'.format(filename_base, filename_extension))
-        if os.path.exists(file_path):
-            i = 1
-            file_path = os.path.join(base_path, '{}-{}{}'.format(filename_base, i, filename_extension))
-            while os.path.exists(file_path):
-                i += 1
+        if not filename_extension:
+            return None
+        else:
+            file_path = os.path.join(base_path, '{}{}'.format(filename_base, filename_extension))
+            if os.path.exists(file_path):
+                i = 1
                 file_path = os.path.join(base_path, '{}-{}{}'.format(filename_base, i, filename_extension))
-        return file_path
+                while os.path.exists(file_path):
+                    i += 1
+                    file_path = os.path.join(base_path, '{}-{}{}'.format(filename_base, i, filename_extension))
+            return file_path
 
 
 class Headers:
