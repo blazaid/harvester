@@ -377,7 +377,8 @@ class FileField(Field):
         content, headers, _ = Model.touch(
             self.as_absolute(value),
             headers=self._model.request_headers(),
-            proxy=self._model.proxy()
+            proxy=self._model.proxy(),
+            cookies=self._model.cookies(),
         )
 
         if 'Content-Disposition' in headers and len(re.findall(r'filename=(\S+)', headers['Content-Disposition'])) > 0:
