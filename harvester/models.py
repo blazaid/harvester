@@ -1,19 +1,19 @@
 import abc
-import os
-from random import choice, uniform
-import re
-from urllib.parse import urlparse, parse_qs, urlencode
-from urllib.request import ProxyHandler, build_opener, HTTPCookieProcessor
 import http.cookiejar
+import imghdr
+import mimetypes
+import os
+import re
 import time
 import uuid
-import mimetypes
-import imghdr
+from random import choice, uniform
+from urllib.parse import urlparse, parse_qs, urlencode
+from urllib.request import ProxyHandler, build_opener, HTTPCookieProcessor
 
-from . import __version__, __github_url__
-from .utils import fix_url, force_decode
-from .user_agents import USER_AGENTS
 from harvester.utils import is_url
+from . import __version__, __github_url__
+from .user_agents import USER_AGENTS
+from .utils import fix_url, force_decode
 
 
 class Field(metaclass=abc.ABCMeta):
@@ -242,7 +242,7 @@ class IntegerField(Field):
 class FloatField(Field):
     """ Field for processing integer types. """
 
-    def __init__(self, *args, decimal_mark='.', **kwargs):
+    def __init__(self, *args, decimal_mark='.', thousands_mark=None, **kwargs):
         """ Initializes the descriptor for float types
 
         :param args: All the positional parameters specified in Field superclass.
@@ -252,7 +252,10 @@ class FloatField(Field):
         """
         super().__init__(*args, **kwargs)
         self.decimal_mark = decimal_mark
-        self.thousands_mark = ',' if decimal_mark == '.' else '.'
+        if thousands_mark is None:
+            self.thousands_mark = ',' if decimal_mark == '.' else '.'
+        else:
+            self.thousands_mark = thousands_mark
 
     def process(self, value):
         """ Transforms the extracted value to the expected integer data. """
@@ -542,10 +545,13 @@ class Model:
                 cookies=self.__cookies,
             )
 
-            content_type_args = {k.strip(): v for k, v in parse_qs(self.__response_headers.get('Content-Type', {})).items()}
-            codecs_to_try = content_type_args['charset'][0] if 'charset' in content_type_args and content_type_args['charset'] else []
+            content_type_args = {k.strip(): v for k, v in
+                                 parse_qs(self.__response_headers.get('Content-Type', {})).items()}
+            codecs_to_try = content_type_args['charset'][0] if 'charset' in content_type_args and content_type_args[
+                'charset'] else []
 
-            decoded_content = force_decode(content, codecs_to_try, deep_encoding_discovery=self.__deep_encoding_discovery)
+            decoded_content = force_decode(content, codecs_to_try,
+                                           deep_encoding_discovery=self.__deep_encoding_discovery)
 
             if self.cache_enabled():
                 self.cache[self.url()] = decoded_content
@@ -571,12 +577,12 @@ class Model:
                 name: getattr(self, name)
                 for name in dir(self)
                 if isinstance(getattr(self, name), Field)
-                }
+            }
 
             dependencies = {
                 name: field.dependencies
                 for name, field in fields.items()
-                }
+            }
             fields_ok = []
             fields_remaining = [f for f in dependencies]
             while fields_remaining:
@@ -588,7 +594,7 @@ class Model:
                         dependencies[field] = [
                             d for d in dependencies[field]
                             if d not in fields_ok
-                            ]
+                        ]
                         if dependencies[field]:
                             fields_remaining.append(field)
                         else:
