@@ -252,10 +252,7 @@ class FloatField(Field):
         """
         super().__init__(*args, **kwargs)
         self.decimal_mark = decimal_mark
-        if thousands_mark is None:
-            self.thousands_mark = ',' if decimal_mark == '.' else '.'
-        else:
-            self.thousands_mark = thousands_mark
+        self.thousands_mark = thousands_mark or (',' if decimal_mark == '.' else '.')
 
     def process(self, value):
         """ Transforms the extracted value to the expected integer data. """
