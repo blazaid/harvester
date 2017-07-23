@@ -550,10 +550,12 @@ class Model:
             decoded_content = force_decode(content, codecs_to_try,
                                            deep_encoding_discovery=self.__deep_encoding_discovery)
 
-            if self.cache_enabled():
-                self.cache[self.url()] = decoded_content
+            content_after_processed_meta = self.process_meta(decoded_content)
 
-            return decoded_content
+            if self.cache_enabled():
+                self.cache[self.url()] = content_after_processed_meta
+
+            return content_after_processed_meta
 
     def __wait_for_connection(self):
         """ Waits some time before doing any connection.
