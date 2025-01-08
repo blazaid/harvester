@@ -1,0 +1,67 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    "setuptools_scm"  # For versioning
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "harvester"
+dynamic = ["version"]
+description = "A lightweight static scraping library in pure Python"
+authors = [
+    { name = "Alberto Díaz Álvarez", email = "alber.diaz@proton.me" }
+]
+license = { text = "GPL-3.0-or-later" }
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = []
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content :: Content Management System",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+]
+
+
+[project.urls]
+# Homepage = "https://blazaid.github.io/harvester"
+# Documentation = "https://readthedocs.org"
+Repository = "https://github.com/blazaid/harvester.git"
+Issues = "https://github.com/blazaid/harvester/issues"
+# Changelog = "https://github.com/blazaid/harvester/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "flake8",
+    "isort",
+    "mypy",
+    "pytest",
+]
+
+[tool.setuptools_scm]
+version_file = "harvester/_version.py"
+
+[tool.black]
+line-length = 120
+target-version = ["py38"]
+skip-string-normalization = false
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+python_version = "3.8"
+disallow_untyped_defs = true
+strict = true
+ignore_missing_imports = true

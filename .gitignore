@@ -61,5 +61,5 @@ target/
 # PyCharm
 .idea
 
-# pypi
-send_to_pypi.sh
+# Project
+harvester/_version.py

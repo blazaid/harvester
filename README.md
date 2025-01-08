@@ -1,57 +1,90 @@
-=========
-harvester
-=========
+# Harvester: An easy-to-use Web Scraping tool.
 
-*********************************
-An easy-to-use Web Scraping tool.
-*********************************
+[![Build Status](https://travis-ci.org/blazaid/harvester.svg?branch=master)](https://travis-ci.org/blazaid/harvester)
+[![Coverage Status](https://coveralls.io/repos/github/blazaid/harvester/badge.svg?branch=master)](https://coveralls.io/github/blazaid/harvester?branch=master)
+[![PyPI version](https://badge.fury.io/py/harvester.svg)](https://badge.fury.io/py/harvester)
+[![Documentation Status](https://readthedocs.org/projects/harvester/badge/?version=latest)](http://harvester.readthedocs.io/en/latest/?badge=latest)
 
-Harvester is a library written in plain python. Its goal is to provide a non-dependent library for easy web scraping.
+Harvester is a lightweight, pure Python library designed for straightforward web scraping without external dependencies.
 
-************
-Installation
-************
+## Features
 
-Installing from pip::
+- **Pure Python**: No third-party dependencies required.
+- **`Model`-`Field` structure**: Define scraping targets using a clear, class-based approach.
+- **Flexible parsing**: Use Python's standard libraries to parse and extract data.
 
-    pip install harvester
+## Installation
 
-Installing from source::
+Installing via pip:
 
-    pip install git+https://github.com/blazaid/harvester
+```bash
+pip install harvester
+```
 
-Requirements
-============
+Or directly from the source code:
 
-There are no mandatory requirements. However to use option A, is necessary the installation of library `chardet <https://pypi.python.org/pypi/chardet>`_ is mandatory. If it is not
-installed, the option will be ignored leaving a trace.
+```bash
+pip install git+https://github.com/blazaid/harvester
+```
 
-*************
-Documentation
-*************
+## Requirements
 
-We're exporting the documentation to "readthedocs". Until then, the source code is a very good place (and the only one) to get the documentation. We'll upload the docs as soon as
-we can.
+Harvester is compatible with Python >= 3.8 versions. There are no mandatory external dependencies. However, for certain
+features, the `chardet` library may be beneficial. If `chardet` is not installed, those features will be bypassed with a
+warning.
 
-*******
-Authors
-*******
+## Usage
 
-`harvester` was written by `Blazaid <alberto.da@gmail.com>`_ with help from `Davyria <https://github.com/davyria>`_.
+Define your data models by subclassing `Model` and specifying fields:
 
-Thanks
-======
+```python
+from harvester import Model, StringField, IntegerField
 
-To you.
+class Product(Model):
+    name = StringField()
+    price = IntegerField()
+```
 
+Parse the HTML content and extract data using the model:
 
-Warning
-=======
+```python
+from harvester import parse_html
 
-It has been developed with only python 3.X in mind, so it won't probably work on lower versions (i.e. no python 2.X support).
+html_content = """
+<html>
+<body>
+    <h1 class="product-name">Example Product</h1>
+    <span class="product-price">100</span>
+</body>
+</html>
+"""
 
-Second warning
-==============
+mapping = {
+    "name": "h1.product-name",
+    "price": "span.product-price"
+}
 
-English included in both this document and the code can be devastating for the brain of an average human being. Even so we, the poor developers, are working hard to write as
-correctly as possible and learn along the way. The documentation will be updated as we improve our language proficency as well as we receive critical / suggestions for this.
+product = parse_html(html_content, Product, mapping=mapping)
+print(product.to_dict())
+```
+
+This will output:
+
+```python
+{"name": "Example Product", "price": 100}
+```
+
+## Documentation
+
+Comprehensive documentation is forthcoming and will be available on Read the Docs. In the meantime, the source code is
+the best place to find information.
+
+## Contributing
+
+Contributions are welcome! Please review the [issues](https://github.com/blazaid/harvester/issues) for current topics
+and feel free to submit pull requests. Also make sure to read the [contributing guidelines](CONTRIBUTING.md) to get
+started.
+
+## License
+
+Harvester is licensed under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file detailed information.
