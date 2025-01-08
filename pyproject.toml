@@ -30,21 +30,19 @@ classifiers = [
 
 
 [project.urls]
-# Homepage = "https://example.com"
+# Homepage = "https://blazaid.github.io/harvester"
 # Documentation = "https://readthedocs.org"
-# Repository = "https://github.com/me/spam.git"
-# Issues = "https://github.com/me/spam/issues"
-# Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
+Repository = "https://github.com/blazaid/harvester.git"
+Issues = "https://github.com/blazaid/harvester/issues"
+# Changelog = "https://github.com/blazaid/harvester/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
     "black",
-    "build",
     "flake8",
     "isort",
     "mypy",
     "pytest",
-    "twine",
 ]
 
 [tool.black]
