@@ -25,4 +25,8 @@ jobs:
           TWINE_REPOSITORY: pypi
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-        run: twine upload dist/*
+        run: |
+          echo $TWINE_REPOSITORY
+          echo $TWINE_USERNAME
+          echo $TWINE_PASSWORD
+          twine upload dist/*
