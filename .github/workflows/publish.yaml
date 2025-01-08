@@ -1,27 +1,25 @@
 name: Test and publish
 
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [created]
 
 jobs:
-  build:
+  publish:
+    name: Publish release to PyPI
     runs-on: ubuntu-latest
-
+    environment:
+        name: pypi
+        url: https://pypi.org/project/harvester/
+    permissions:
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: '3.x'
-      - run: |
-          pip install build setuptools_scm twine
-
+      - run: pip install build setuptools_scm
       - name: 📦 Building package 📦
         run: python -m build
-
       - name: 🚀 Publishing to PyPI 🚀
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: twine upload dist/*
+        uses: pypa/gh-action-pypi-publish@release/v1

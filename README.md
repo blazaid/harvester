@@ -1,9 +1,9 @@
 # Harvester: An easy-to-use Web Scraping tool.
 
-[![Build Status](https://travis-ci.org/blazaid/harvester.svg?branch=master)](https://travis-ci.org/blazaid/harvester)
-[![Coverage Status](https://coveralls.io/repos/github/blazaid/harvester/badge.svg?branch=master)](https://coveralls.io/github/blazaid/harvester?branch=master)
-[![PyPI version](https://badge.fury.io/py/harvester.svg)](https://badge.fury.io/py/harvester)
-[![Documentation Status](https://readthedocs.org/projects/harvester/badge/?version=latest)](http://harvester.readthedocs.io/en/latest/?badge=latest)
+<!-- [![Build Status](https://travis-ci.org/blazaid/harvester.svg?branch=master)](https://travis-ci.org/blazaid/harvester) -->
+<!-- [![Coverage Status](https://coveralls.io/repos/github/blazaid/harvester/badge.svg?branch=master)](https://coveralls.io/github/blazaid/harvester?branch=master) -->
+<!-- [![PyPI version](https://badge.fury.io/py/harvester.svg)](https://badge.fury.io/py/harvester) -->
+<!-- [![Documentation Status](https://readthedocs.org/projects/harvester/badge/?version=latest)](http://harvester.readthedocs.io/en/latest/?badge=latest) -->
 
 Harvester is a lightweight, pure Python library designed for straightforward web scraping without external dependencies.
 
