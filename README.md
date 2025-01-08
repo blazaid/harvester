@@ -9,9 +9,9 @@ Harvester is a lightweight, pure Python library designed for straightforward web
 
 ## Features
 
-- Pure Python: No third-party dependencies required.
-- Model-Field structure: Define scraping targets using a clear, class-based approach.
-- Flexible parsing: Use Python's standard libraries to parse and extract data.
+- **Pure Python**: No third-party dependencies required.
+- **`Model`-`Field` structure**: Define scraping targets using a clear, class-based approach.
+- **Flexible parsing**: Use Python's standard libraries to parse and extract data.
 
 ## Installation
 
