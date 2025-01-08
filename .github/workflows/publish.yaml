@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: '3.x'
       - run: |
-          pip install build twine
+          pip install build setuptools_scm twine
 
       - name: 📦 Building package 📦
         run: python -m build

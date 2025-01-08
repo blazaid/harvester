@@ -1,10 +1,14 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    "setuptools_scm"  # For versioning
+]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "harvester"
-version = "0.4.0"
+dynamic = ["version"]
 description = "A lightweight static scraping library in pure Python"
 authors = [
     { name = "Alberto Díaz Álvarez", email = "alber.diaz@proton.me" }
@@ -44,6 +48,9 @@ dev = [
     "mypy",
     "pytest",
 ]
+
+[tool.setuptools_scm]
+version_file = "harvester/_version.py"
 
 [tool.black]
 line-length = 120
