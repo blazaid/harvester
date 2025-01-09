@@ -12,7 +12,6 @@ from urllib.request import HTTPCookieProcessor, ProxyHandler, build_opener
 
 from harvester.utils import is_url
 
-from . import __github_url__, __version__
 from .user_agents import USER_AGENTS
 from .utils import fix_url, force_decode
 
@@ -667,7 +666,7 @@ class Model:
 
         If the harvester is configured with "disguise" parameter, the user agent will be one out of the existent agents. If not, the agent will be the harvester user agent.
         """
-        return choice(USER_AGENTS) if self.__disguise else "Harvester v.{} ({})".format(__version__, __github_url__)
+        return choice(USER_AGENTS) if self.__disguise else "Harvester"
 
     def disguise(self):
         """Returns if the model is or not in disguise model."""
