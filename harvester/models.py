@@ -11,11 +11,12 @@ from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import HTTPCookieProcessor, ProxyHandler, build_opener
 
 from harvester.utils import is_url
-
+from ._version import __version__
 from .user_agents import USER_AGENTS
 from .utils import fix_url, force_decode
 
 
+# TODO: Maybe this class should be de default CharField class
 class Field(metaclass=abc.ABCMeta):
     """A fragment of data delimited by two regular expressions."""
 
@@ -41,7 +42,7 @@ class Field(metaclass=abc.ABCMeta):
         self.__as_list = as_list
         self.__skip_new_lines = skip_new_lines
 
-        self.__regex = "{0}(.*?){1}".format(start, end)
+        self.__regex = f"{start}(.*?){end}"
         self.__mods = [mods] if mods and not isinstance(mods, (list, tuple)) else mods or []
         self.__deps = [deps] if deps and not isinstance(deps, (list, tuple)) else deps or []
 
@@ -168,7 +169,7 @@ class BooleanField(Field):
 class CharField(Field):
     """Field for processing text types."""
 
-    def __init__(self, *args, prefix=None, suffix=None, strip_tags=False, stripped=False, **kwargs):
+    def __init__(self, *args, prefix=None, suffix=None, deps=None, strip_tags=False, stripped=False, **kwargs):
         """Initializes the field descriptor for textual contents.
 
         The field also allows the user to add a prefix and suffix string to the field. This parameters should be valid
@@ -182,7 +183,7 @@ class CharField(Field):
             this field. If not None (the default) it should be the name of a valid existent field in the same model
             where the instance of this field is used. Otherwise, a ValueError will be raised when the method "cast" is
             being called.
-        :param suffix: The name of the field that belongs to the same model of this field and to be used as prefix of
+        :param suffix: The name of the field that belongs to the same model of this field and to be used as suffix of
             this field. If not None (the default) it should be the name of a valid existent field in the same model
             where the instance of this field is used. Otherwise, a ValueError will be raised when the method "cast" is
             being called.
@@ -190,7 +191,7 @@ class CharField(Field):
         :param stripped: If the field is needed as stripped, that is, without leading and trailing white characters.
         :param kwargs: All the mandatory parameters specified in Field superclass.
         """
-        super().__init__(*args, deps=[x for x in (prefix, suffix) if x], **kwargs)
+        super().__init__(*args, deps=[x for x in (prefix, suffix) if x] + (deps or []), **kwargs)
         self.__prefix = prefix
         self.__suffix = suffix
         self.__strip_tags = strip_tags
@@ -209,7 +210,7 @@ class CharField(Field):
             if suffix:
                 casted_value = "{0}{1}".format(casted_value, suffix)
         if self.__strip_tags:
-            casted_value = re.sub("<[^<]+>", " ", casted_value)
+            casted_value = re.sub("<[^<]+>", "", casted_value)
 
         return casted_value
 
@@ -264,38 +265,6 @@ class FloatField(Field):
         value = value.replace(temp_mark, ".")
 
         return float(value)
-
-
-class DateField(Field):
-    """Field for processing files."""
-
-    def __init__(self, *args, formats=None, **kwargs):
-        """Initializes the field descriptor for date contents.
-
-        Works as a Field object, returning the content as a date. The field works using a set of formats to parse the
-        date, so at least one format is required.
-
-        The developer should be aware that using the same field as prefix (or suffix) and base field could lead to a
-        infinite loop. So be careful!
-
-        :param args: All the positional parameters specified in Field superclass.
-        :param formats: The formats to be used to parse the date. It could be a single string or a list (or tuple) of
-            strings, where each string is a date casting format. If no format is supplied, a ValueError will be raised.
-            If no format can decode the data, a value of None will be returned.
-        :param kwargs: All the mandatory parameters specified in Field superclass.
-        :raises ValueError: Any of the parameters is not valid.
-        """
-        super().__init__(self, *args, **kwargs)
-        self.__formats = list(formats) if not isinstance(formats, (list, tuple)) else formats
-
-    def process(self, value):
-        """Transforms the extracted value to the expected date.
-
-        Does the required casting to a date value. This process will be accomplished by trying one by one all formats
-        supplied at initialization time.
-        """
-        # TODO Hacer el método (y asegurarse de que termina, o bien devolviendo una fecha o bien devolviendo None).
-        raise NotImplementedError()
 
 
 class ModelField(Field):
@@ -414,23 +383,26 @@ class FileField(Field):
             filename_extension = ".{}".format(ext) if ext else None
         if not filename_extension:
             # Ok, not an image. Let's guess it from the mimetype returned by the headers.
-            filename_extension = (
-                key
-                for key, value in mimetypes.types_map.items()
-                if value == self._model.response_headers().get("Content-Type", None)
-            ).__next__()
-
+            filename_extension = next(
+                (
+                    key
+                    for key, value in mimetypes.types_map.items()
+                    if value == self._model.response_headers().get("Content-Type", None)
+                ),
+                None,
+            )
         if not filename_extension:
-            return None
-        else:
-            file_path = os.path.join(base_path, "{}{}".format(filename_base, filename_extension))
-            if os.path.exists(file_path):
-                i = 1
-                file_path = os.path.join(base_path, "{}-{}{}".format(filename_base, i, filename_extension))
-                while os.path.exists(file_path):
-                    i += 1
-                    file_path = os.path.join(base_path, "{}-{}{}".format(filename_base, i, filename_extension))
-            return file_path
+            # Well, no luck. We'll use no extension.
+            filename_extension = ""
+
+        file_path = os.path.join(base_path, f"{filename_base}{filename_extension}")
+        if os.path.exists(file_path):
+            i = 1
+            file_path = os.path.join(base_path, "{filename_base}-{i}{filename_extension}")
+            while os.path.exists(file_path):
+                i += 1
+                file_path = os.path.join(base_path, "{filename_base}-{i}{filename_extension}")
+        return file_path
 
 
 class Headers:
@@ -580,24 +552,32 @@ class Model:
             dependencies = {name: field.dependencies for name, field in fields.items()}
             fields_ok = []
             fields_remaining = [f for f in dependencies]
+
             while fields_remaining:
                 num_fields_remaining = len(fields_remaining)
                 i = 0
                 while i < num_fields_remaining:
                     field = fields_remaining.pop(0)
+
+                    # We check if all the dependencies exist in 'fields'
+                    for dep in dependencies[field]:
+                        if dep not in fields:
+                            raise FieldNotFoundError(f"Field '{dep}' not found (needed by '{field}').")
+
+                    # Now, we remove all the dependencies already solved for this field
+                    dependencies[field] = [d for d in dependencies[field] if d not in fields_ok]
+
                     if dependencies[field]:
-                        dependencies[field] = [d for d in dependencies[field] if d not in fields_ok]
-                        if dependencies[field]:
-                            fields_remaining.append(field)
-                        else:
-                            fields_ok.append(field)
-                            result = fields[field](self)
-                            setattr(self, field, result)
+                        # Oh no, we have pending dependencies. Let's put it back at the end of the list
+                        fields_remaining.append(field)
                     else:
+                        # Well, no pending dependencies. Let's extract the field
                         fields_ok.append(field)
                         result = fields[field](self)
                         setattr(self, field, result)
                     i += 1
+
+                # If after all of this, we have the same number of fields remaining, we have a circular dependency
                 if num_fields_remaining == len(fields_remaining):
                     raise CircularDependencyError(fields_remaining)
 
@@ -666,7 +646,7 @@ class Model:
 
         If the harvester is configured with "disguise" parameter, the user agent will be one out of the existent agents. If not, the agent will be the harvester user agent.
         """
-        return choice(USER_AGENTS) if self.__disguise else "Harvester"
+        return choice(USER_AGENTS) if self.__disguise else f"Harvester {__version__}"
 
     def disguise(self):
         """Returns if the model is or not in disguise model."""

@@ -1,6 +1,5 @@
 import re
-from urllib.parse import quote, quote_plus, urlencode, urlsplit, urlunsplit
-from urllib.request import ProxyHandler, build_opener
+from urllib.parse import quote, quote_plus, urlsplit, urlunsplit
 
 
 def force_decode(bytes_array, codecs_to_try_first=None, deep_encoding_discovery=False):

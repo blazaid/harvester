@@ -42,11 +42,13 @@ Issues = "https://github.com/blazaid/harvester/issues"
 
 [project.optional-dependencies]
 dev = [
+    "chardet",
     "black",
     "flake8",
     "isort",
     "mypy",
     "pytest",
+    "pytest-cov",
 ]
 
 [tool.setuptools_scm]
