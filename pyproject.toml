@@ -56,8 +56,8 @@ version_file = "harvester/_version.py"
 
 [tool.black]
 line-length = 120
-target-version = ["py38"]
-skip-string-normalization = false
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+skip-string-normalization = false  # Always set double quotes in strings
 
 [tool.isort]
 profile = "black"

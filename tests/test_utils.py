@@ -1,6 +1,6 @@
 import pytest
 
-from harvester.utils import force_decode, is_url, fix_url
+from harvester.utils import fix_url, force_decode, is_url
 
 
 class TestUtils:
@@ -18,9 +18,7 @@ class TestUtils:
         assert result == expected
 
     def test_force_decode_with_chardet_installed(self, monkeypatch):
-        """
-        Este test simula que chardet está instalado y que detecta el codec 'utf-8'.
-        """
+        """Simulates that chardet is installed and detects the 'utf-8' codec."""
         try:
             import chardet  # Verificamos si está instalado, si no, saltamos el test
         except ImportError:

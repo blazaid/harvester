@@ -1,6 +1,7 @@
 import abc
 import http.cookiejar
 import imghdr
+import logging
 import mimetypes
 import os
 import re
@@ -10,7 +11,8 @@ from random import choice, uniform
 from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import HTTPCookieProcessor, ProxyHandler, build_opener
 
-from harvester.utils import is_url
+from harvester.utils import fetch_content, is_url, parse_content_disposition_filename
+
 from ._version import __version__
 from .user_agents import USER_AGENTS
 from .utils import fix_url, force_decode
@@ -37,6 +39,8 @@ class Field(metaclass=abc.ABCMeta):
             processed before.
         :param skip_new_lines: If the new line characters should be skipped (included) in pattern matching.
         """
+        self.logger = logging.getLogger(__name__)
+
         self.__start = start
         self.__end = end
         self.__as_list = as_list
@@ -325,7 +329,7 @@ class ModelField(Field):
 class FileField(Field):
     """Field for processing files."""
 
-    def __init__(self, *args, upload_to, **kwargs):
+    def __init__(self, *args, upload_to, warn_on_error=True, **kwargs):
         """Initializes the file descriptor for processing files.
 
         Works as a Field object but, instead processing the content between the two delimiters (i.e. "start" and "end"
@@ -334,27 +338,32 @@ class FileField(Field):
         :param upload_to: A local directory to save the file.
         :param args: All the positional parameters specified in Field superclass.
         :param kwargs: All the mandatory parameters specified in Field superclass.
+        :param warn_on_error: If True, a warning will be displayed in case of an error while downloading the file. If
+            False, the error will be raised. Defaults to True.
         """
         super().__init__(*args, **kwargs)
         self.upload_to = upload_to
+        self.warn_on_error = warn_on_error
 
     def process(self, value):
         """Downloads the content."""
-        value = value.strip()
-        if value[:2] == "//":
-            value = "http:" + value
+        try:
+            content, headers, _ = fetch_content(
+                url=self.as_absolute(value),
+                headers=self._model.request_headers(),
+                proxy=self._model.proxy(),
+                cookies=self._model.cookies(),
+                normalize_url_function=lambda url: f"http://{value}" if value[:2] == "//" else value,
+            )
+        except Exception as e:
+            if self.warn_on_error:
+                self.logger.warning(f"Error downloading file: {value}. Exception {e}")
+                return None
+            else:
+                raise e
 
-        content, headers, _ = Model.touch(
-            self.as_absolute(value),
-            headers=self._model.request_headers(),
-            proxy=self._model.proxy(),
-            cookies=self._model.cookies(),
-        )
-
-        if "Content-Disposition" in headers and len(re.findall(r"filename=(\S+)", headers["Content-Disposition"])) > 0:
-            filename = re.findall(r"filename=(\S+)", headers["Content-Disposition"])[0].strip()
-        else:
-            filename = value
+        content_disposition = headers.get("Content-Disposition", "")
+        filename = parse_content_disposition_filename(content_disposition) if content_disposition else value
 
         file_path = self.get_file_path(filename, content)
         if file_path:
@@ -376,6 +385,7 @@ class FileField(Field):
         if not os.path.exists(base_path):
             os.makedirs(base_path)
 
+        # TODO: Sospecho que esto nos puede jugar alguna mala pasada si la url es rara y devuelve una imagen
         filename_base, filename_extension = os.path.splitext(file_url.split("/")[-1])
         if not filename_extension:
             # No extension in filename so let's see if it's an image (see the content).
@@ -506,8 +516,9 @@ class Model:
         else:
             # Cache is not activated or url is not in cache so let's connect
             self.__wait_for_connection()
-            content, self.__response_headers, cookies = self.touch(
-                self.url(),
+
+            content, self.__response_headers, cookies = fetch_content(
+                url=self.url(),
                 data=self.__post_data,
                 headers=self.request_headers(),
                 proxy=self.proxy(),
@@ -702,23 +713,6 @@ class Model:
 
     @staticmethod
     def touch(url, data=None, headers=None, proxy=None, cookies=None):
-        """Touches the given url.
-
-        The proxy to use may be specified (if needed, is optional) in two forms:
-        1. As an IP: an string representing a valid IP. In this case, the proxy will be used by all the needed protocols.
-        2. As a dictionary: The keys will be the protocols and the values will be the ip to use in this protocols. An example of this is as follows:
-        proxy = {
-            'http': '82.31.89.21',
-            'https': '82.31.89.27'
-        }
-
-        :param url: The url to connect to.
-        :param data: In case of a POST or PUT method, the data to be sent. Defaults to None.
-        :param headers: The headers to send along with the request. Should be represented as a dictionary.
-        :param proxy: The proxy through which to connect. May be specified as a dictionary or a string (see above for more information). Defaults to None (i.e. no proxy).
-        :return: A tuple in the form (content, headers, cookies) representing the content of the response as a byte-string, the response headers as a dictionary and the cookies
-            sent by the server.
-        """
         # Process the data
         data_to_send = urlencode(data).encode("utf-8") if data else None
 

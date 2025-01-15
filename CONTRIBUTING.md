@@ -43,14 +43,14 @@ requests, or pull requests. Please follow the guidelines below to ensure that yo
 ## Submitting changes
 
 1. Fork the repository and create a new branch.
-   - This is done by clicking the [Fork](https://github.com/blazaid/harvester/fork) button on the top right of the
-     [repository page](https://github.com/blazaid/harvester).
+    - This is done by clicking the [Fork](https://github.com/blazaid/harvester/fork) button on the top right of the
+      [repository page](https://github.com/blazaid/harvester).
 2. Create a new branch for your changes:
    ```bash
    git checkout -b feature/your-feature-name
    ```
 3. Make your changes and commit them
-   - Follow the [commit message conventions](https://www.conventionalcommits.org/en/v1.0.0/)
+    - Follow the [commit message conventions](https://www.conventionalcommits.org/en/v1.0.0/)
    ```python
    git add .
    git commit -m "feat: Description for the changes"
@@ -60,4 +60,4 @@ requests, or pull requests. Please follow the guidelines below to ensure that yo
     git push origin feature/your-feature-name
     ```
 5. Create a pull request:
-   - Go to the [pull requests](https://github.com/blazaid/harvester/pulls) page of the repository.
+    - Go to the [pull requests](https://github.com/blazaid/harvester/pulls) page of the repository.
