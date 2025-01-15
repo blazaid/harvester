@@ -84,7 +84,7 @@ def test_process_content_disposition_filename(file_field_instance, mock_fetch_co
     assert saved_path is not None
     assert os.path.exists(saved_path)
 
-    assert saved_path.endswith(expected_filename)
+    assert saved_path.name == expected_filename
 
     with open(saved_path, "rb") as f:
         assert f.read() == b"fake file content"
@@ -104,7 +104,7 @@ def test_process_no_content_disposition_uses_value_as_filename(file_field_instan
     assert os.path.exists(saved_path)
 
     # Should default to 'file.dat' from the URL
-    assert saved_path.endswith("file.dat")
+    assert saved_path.name == "file.dat"
 
     with open(saved_path, "rb") as f:
         assert f.read() == b"content with no cd header"
@@ -169,7 +169,7 @@ def test_process_auto_extension_from_image(file_field_instance, mock_fetch_conte
     with patch("imghdr.what", return_value="png"):
         saved_path = file_field_instance.process("http://example.com/imagefile")
 
-    assert saved_path.endswith(".png")
+    assert saved_path.suffix == ".png"
     assert os.path.exists(saved_path)
 
 
@@ -185,7 +185,7 @@ def test_process_auto_extension_from_mimetype(file_field_instance, mock_fetch_co
 
     saved_path = file_field_instance.process("http://example.com/unknown")
 
-    assert saved_path.endswith(".pdf")
+    assert saved_path.suffix == ".pdf"
     assert os.path.exists(saved_path)
 
 
@@ -196,5 +196,5 @@ def test_process_no_extension_no_image_no_mimetype(file_field_instance, mock_fet
 
     saved_path = file_field_instance.process("http://example.com/blank")
 
-    assert saved_path.endswith("myfile")
+    assert saved_path.name == "myfile"
     assert os.path.exists(saved_path)

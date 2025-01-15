@@ -4,6 +4,7 @@ import imghdr
 import logging
 import mimetypes
 import os
+import pathlib
 import re
 import time
 import uuid
@@ -12,7 +13,6 @@ from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import HTTPCookieProcessor, ProxyHandler, build_opener
 
 from harvester.utils import fetch_content, is_url, parse_content_disposition_filename
-
 from ._version import __version__
 from .user_agents import USER_AGENTS
 from .utils import fix_url, force_decode
@@ -381,37 +381,44 @@ class FileField(Field):
 
     def get_file_path(self, file_url, content):
         # TODO Lo mismo viene bien sacar esto a utilidades
-        base_path = os.path.abspath(self.upload_to)
-        if not os.path.exists(base_path):
-            os.makedirs(base_path)
+        base_path = pathlib.Path(self.upload_to).resolve()
+        if not base_path.exists():
+            base_path.mkdir(parents=True, exist_ok=True)
 
         # TODO: Sospecho que esto nos puede jugar alguna mala pasada si la url es rara y devuelve una imagen
         filename_base, filename_extension = os.path.splitext(file_url.split("/")[-1])
+
         if not filename_extension:
-            # No extension in filename so let's see if it's an image (see the content).
+            # Try detecting an image extension
             ext = imghdr.what(None, h=content)
-            filename_extension = ".{}".format(ext) if ext else None
+            filename_extension = f".{ext}" if ext else None
+
         if not filename_extension:
-            # Ok, not an image. Let's guess it from the mimetype returned by the headers.
+            # Guess from mimetype
             filename_extension = next(
                 (
-                    key
-                    for key, value in mimetypes.types_map.items()
-                    if value == self._model.response_headers().get("Content-Type", None)
+                    ext
+                    for ext, mime in mimetypes.types_map.items()
+                    if mime == self._model.response_headers().get("Content-Type", None)
                 ),
                 None,
             )
+
         if not filename_extension:
-            # Well, no luck. We'll use no extension.
+            # Fallback to no extension
             filename_extension = ""
 
-        file_path = os.path.join(base_path, f"{filename_base}{filename_extension}")
-        if os.path.exists(file_path):
+        # Construct initial file path
+        file_path = base_path / f"{filename_base}{filename_extension}"
+
+        # If a file already exists, append a numeric suffix
+        if file_path.exists():
             i = 1
-            file_path = os.path.join(base_path, "{filename_base}-{i}{filename_extension}")
-            while os.path.exists(file_path):
+            file_path = base_path / f"{filename_base}-{i}{filename_extension}"
+            while file_path.exists():
                 i += 1
-                file_path = os.path.join(base_path, "{filename_base}-{i}{filename_extension}")
+                file_path = base_path / f"{filename_base}-{i}{filename_extension}"
+
         return file_path
 
 
