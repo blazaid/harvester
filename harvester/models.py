@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import HTTPCookieProcessor, ProxyHandler, build_opener
 
 from harvester.utils import fetch_content, is_url, parse_content_disposition_filename
+
 from ._version import __version__
 from .user_agents import USER_AGENTS
 from .utils import fix_url, force_decode
