@@ -1,4 +1,5 @@
 import abc
+import html
 import http.cookiejar
 import imghdr
 import logging
@@ -174,7 +175,17 @@ class BooleanField(Field):
 class CharField(Field):
     """Field for processing text types."""
 
-    def __init__(self, *args, prefix=None, suffix=None, deps=None, strip_tags=False, stripped=False, **kwargs):
+    def __init__(
+        self,
+        *args,
+        prefix=None,
+        suffix=None,
+        deps=None,
+        strip_tags=False,
+        stripped=False,
+        decode_html=False,
+        **kwargs,
+    ):
         """Initializes the field descriptor for textual contents.
 
         The field also allows the user to add a prefix and suffix string to the field. This parameters should be valid
@@ -192,8 +203,10 @@ class CharField(Field):
             this field. If not None (the default) it should be the name of a valid existent field in the same model
             where the instance of this field is used. Otherwise, a ValueError will be raised when the method "cast" is
             being called.
-        :param strip_tags: If any html tag should be removed (strip_tags = True) or not. isabled by default.
+        :param strip_tags: If any html tag should be removed (strip_tags = True) or not. Disabled by default.
         :param stripped: If the field is needed as stripped, that is, without leading and trailing white characters.
+            Disabled by default.
+        :param decode_html: If the html entities should be decoded. Disabled by default.
         :param kwargs: All the mandatory parameters specified in Field superclass.
         """
         super().__init__(*args, deps=[x for x in (prefix, suffix) if x] + (deps or []), **kwargs)
@@ -201,6 +214,7 @@ class CharField(Field):
         self.__suffix = suffix
         self.__strip_tags = strip_tags
         self.__stripped = stripped
+        self.__decode_html = decode_html
 
     def process(self, value):
         """Transforms the extracted value to the expected textual data."""
@@ -216,6 +230,8 @@ class CharField(Field):
                 casted_value = "{0}{1}".format(casted_value, suffix)
         if self.__strip_tags:
             casted_value = re.sub("<[^<]+>", "", casted_value)
+        if self.__decode_html:
+            casted_value = html.unescape(casted_value)
 
         return casted_value
 
